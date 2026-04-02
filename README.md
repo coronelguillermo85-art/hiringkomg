@@ -27,7 +27,7 @@ Este proyecto fue desarrollado bajo una premisa de **cero dependencias externas*
 * **Animación:** `requestAnimationFrame` para un flujo constante de 60fps.
 * **Diseño:** Pixel Art procesado mediante `image-rendering: pixelated` para mantener una estética retro-tech.
 
-## 🎯 El Objetivo Final: Conversión <img width="1024" height="1536" alt="ChatGPT Image 2 abr 2026, 14_23_44" src="https://github.com/user-attachments/assets/4d0360cb-eea7-4cb1-bf73-dbc3d8d32107" />
+## 🎯 El Objetivo Final: Conversión 
 
 
 A diferencia de un juego convencional, **Hiring Kong** es una herramienta de conversión. Al alcanzar la meta de 4500 puntos (o agotar el tiempo), el juego culmina en un mensaje de éxito: **"CONSEGUISTE LABURO"**. 
