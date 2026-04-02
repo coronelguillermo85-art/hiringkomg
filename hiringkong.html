@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HIRINGKONG — El recruiter que sí contrata</title>
+  <style>
+    :root {
+      --bg: #07111d;
+      --bg2: #10233b;
+      --floor: #182838;
+      --panel: rgba(5, 10, 18, 0.84);
+      --line: #2ef07f;
+      --gold: #f2c94c;
+      --text: #e9f2ff;
+      --danger: #ff5d73;
+      --blue: #79c7ff;
+      --pink: #ff93a7;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      background: radial-gradient(circle at top, #173154 0%, #08111f 45%, #040911 100%);
+      color: var(--text);
+      font-family: monospace;
+    }
+    .wrap {
+      width: min(98vw, 1080px);
+      padding: 12px;
+    }
+    .titlebar {
+      text-align: center;
+      margin-bottom: 8px;
+      text-shadow: 0 0 12px rgba(46,240,127,.25);
+    }
+    .titlebar h1 {
+      margin: 0;
+      font-size: clamp(24px, 4vw, 42px);
+      letter-spacing: 2px;
+      color: var(--line);
+    }
+    .titlebar p {
+      margin: 4px 0 0;
+      color: #b8d6ff;
+      font-size: 14px;
+    }
+    canvas {
+      width: 100%;
+      height: auto;
+      display: block;
+      border: 4px solid var(--line);
+      border-radius: 16px;
+      background: linear-gradient(#18335a, #0a1421 62%);
+      image-rendering: pixelated;
+      box-shadow: 0 0 28px rgba(46,240,127,.15), 0 0 0 6px rgba(0,0,0,.35) inset;
+    }
+    .controls {
+      margin-top: 10px;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #10243a;
+      color: var(--text);
+      border: 2px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 16px;
+      font: inherit;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    button:hover { filter: brightness(1.08); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="titlebar">
+      <h1>🦍 HIRINGKONG</h1>
+      <p>El recruiter que sí contrata — atrapá talento antes de que escape</p>
+    </div>
+    <canvas id="game" width="1000" height="620"></canvas>
+    <div class="controls">
+      <button id="startBtn">▶ Iniciar</button>
+      <button id="restartBtn">↺ Reiniciar</button>
+      <button id="cvBtn">📄 Ver mi CV</button>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+
+    const W = canvas.width;
+    const H = canvas.height;
+    const FLOOR = 500;
+    const CV_LINK = 'https://drive.google.com/file/d/1LsgIr-vuDw0FUowzPHhzODw-TPC_MqPa/preview';
+
+    const keys = {};
+    let running = false;
+    let gameOver = false;
+    let victory = false;
+    let frame = 0;
+    let officeScroll = 0;
+
+    let score = 0;
+    let escaped = 0;
+    let combo = 0;
+    let bestCombo = 0;
+    let spawnTimer = 38;
+    let gameClock = 60 * 50;
+
+    let freezeTimer = 0;
+    let magnetTimer = 0;
+    let speedTimer = 0;
+
+    let zCombo = 0;
+    let zComboTimer = 0;
+    let contractRain = false;
+    let contractRainTimer = 0;
+
+    let messageTimer = 140;
+    let bigMessage = 'PRESIONÁ INICIAR';
+    let screenFlash = 0;
+
+    const particles = [];
+    const floatTexts = [];
+    const candidates = [];
+    const projectiles = [];
+    const powerups = [];
+
+    const player = {
+      x: 140,
+      y: FLOOR - 84,
+      w: 76,
+      h: 84,
+      vx: 0,
+      vy: 0,
+      speed: 4.2,
+      jumpForce: -13,
+      onGround: true,
+      facing: 1,
+      anim: 0,
+      suitFlash: 0,
+      throwCooldown: 0,
+      throwAnim: 0
+    };
+
+    const candidateTypes = {
+      junior: { color: '#79c7ff', speed: 3.0, points: 320, label: 'JUNIOR' },
+      semi:   { color: '#f2c94c', speed: 2.1, points: 190, label: 'SEMI' },
+      senior: { color: '#ff93a7', speed: 1.45, points: 110, label: 'SENIOR' }
+    };
+
+    function rand(min, max) {
+      return Math.random() * (max - min) + min;
+    }
+
+    function clamp(v, min, max) {
+      return Math.max(min, Math.min(max, v));
+    }
+
+    function rectHit(a, b) {
+      return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+    }
+
+    function resetGame() {
+      running = false;
+      gameOver = false;
+      victory = false;
+      frame = 0;
+      officeScroll = 0;
+      score = 0;
+      escaped = 0;
+      combo = 0;
+      bestCombo = 0;
+      spawnTimer = 38;
+      gameClock = 60 * 50;
+      freezeTimer = 0;
+      magnetTimer = 0;
+      speedTimer = 0;
+      zCombo = 0;
+      zComboTimer = 0;
+      contractRain = false;
+      contractRainTimer = 0;
+      messageTimer = 140;
+      bigMessage = 'PRESIONÁ INICIAR';
+      screenFlash = 0;
+
+      particles.length = 0;
+      floatTexts.length = 0;
+      candidates.length = 0;
+      projectiles.length = 0;
+      powerups.length = 0;
+
+      Object.assign(player, {
+        x: 140,
+        y: FLOOR - 84,
+        w: 76,
+        h: 84,
+        vx: 0,
+        vy: 0,
+        speed: 4.2,
+        jumpForce: -13,
+        onGround: true,
+        facing: 1,
+        anim: 0,
+        suitFlash: 0,
+        throwCooldown: 0,
+        throwAnim: 0
+      });
+
+      draw();
+    }
+
+    function startGame() {
+      if (running || gameOver || victory) return;
+      running = true;
+      bigMessage = '¡A CONTRATAR!';
+      messageTimer = 60;
+      loop();
+    }
+
+    function openCV() {
+      window.open(CV_LINK, '_blank', 'noopener,noreferrer');
+    }
+
+    function addParticles(x, y, amount, color) {
+      for (let i = 0; i < amount; i++) {
+        particles.push({
+          x, y,
+          vx: rand(-3.2, 3.2),
+          vy: rand(-4.2, -1.2),
+          life: rand(20, 40),
+          color
+        });
+      }
+    }
+
+    function addText(text, x, y, color = '#fff') {
+      floatTexts.push({ text, x, y, life: 70, color });
+    }
+
+    function spawnCandidate() {
+      const roll = Math.random();
+      const type = roll < 0.54 ? 'junior' : roll < 0.84 ? 'semi' : 'senior';
+      const t = candidateTypes[type];
+      const fromLeft = Math.random() < 0.5;
+      candidates.push({
+        type,
+        x: fromLeft ? -40 : W + 40,
+        y: FLOOR - 52,
+        w: 30,
+        h: 52,
+        vx: fromLeft ? t.speed : -t.speed,
+        bob: rand(0, Math.PI * 2),
+        color: t.color,
+        points: t.points,
+        label: t.label
+      });
+    }
+
+    function spawnPowerup() {
+      const kinds = ['freeze', 'magnet', 'speed'];
+      const kind = kinds[Math.floor(Math.random() * kinds.length)];
+      powerups.push({
+        x: rand(140, W - 140),
+        y: FLOOR - 130,
+        w: 24,
+        h: 24,
+        kind,
+        ttl: 60 * 8
+      });
+    }
+
+    function catchCandidate(c, sourceType = 'grab') {
+      const gained = c.points + combo * 10;
+      score += gained;
+      combo += 1;
+      bestCombo = Math.max(bestCombo, combo);
+      player.suitFlash = 8;
+      addParticles(c.x + c.w / 2, c.y + 16, 14, c.color);
+      addText('+' + gained + ' ' + c.label, c.x - 8, c.y - 18, c.color);
+      if (combo > 1) addText('COMBO x' + combo, player.x + 10, player.y - 18, '#7dff7d');
+      if (sourceType === 'contract') addText('OFERTA', c.x - 4, c.y - 30, '#2ef07f');
+      if (Math.random() < 0.11) spawnPowerup();
+    }
+
+    function missCandidate(c) {
+      escaped += 1;
+      combo = 0;
+      addText('SE ESCAPÓ', c.x - 10, c.y - 14, '#ff5d73');
+      addParticles(c.x, c.y, 12, '#ff5d73');
+      bigMessage = escaped >= 6 ? '¡SE TE VA EL TALENTO!' : '¡SE ESCAPÓ UNO!';
+      messageTimer = 50;
+      if (escaped >= 6) {
+        running = false;
+        gameOver = true;
+      }
+    }
+
+    function triggerContractRain() {
+      contractRain = true;
+      contractRainTimer = 60;
+      zCombo = 0;
+      zComboTimer = 0;
+      bigMessage = '¡LLUVIA DE CONTRATOS!';
+      messageTimer = 65;
+      screenFlash = 10;
+      addParticles(player.x + 20, player.y + 20, 20, '#2ef07f');
+    }
+
+    function throwArm() {
+      if (player.throwCooldown > 0 || !running) return;
+
+      player.throwCooldown = 16;
+      player.throwAnim = 10;
+
+      projectiles.push({
+        x: player.facing === 1 ? player.x + player.w - 4 : player.x - 22,
+        y: player.y + 30,
+        w: 20,
+        h: 8,
+        vx: player.facing * 8.5,
+        vy: 0,
+        spin: 0,
+        type: 'banana'
+      });
+
+      zCombo += 1;
+      zComboTimer = 42;
+      if (zCombo >= 3) triggerContractRain();
+    }
+
+    function updatePlayer() {
+      const move = (keys['ArrowRight'] || keys['d'] ? 1 : 0) - (keys['ArrowLeft'] || keys['a'] ? 1 : 0);
+      const boost = speedTimer > 0 ? 1.5 : 1;
+
+      player.vx = move * player.speed * boost;
+      player.x += player.vx;
+      player.x = clamp(player.x, 20, W - 90);
+
+      if ((keys['ArrowUp'] || keys['w'] || keys[' ']) && player.onGround) {
+        player.vy = player.jumpForce;
+        player.onGround = false;
+      }
+
+      player.vy += 0.72;
+      player.y += player.vy;
+      if (player.y >= FLOOR - player.h) {
+        player.y = FLOOR - player.h;
+        player.vy = 0;
+        player.onGround = true;
+      }
+
+      if (move !== 0) player.facing = move;
+      if (Math.abs(player.vx) > 0.1) player.anim += 0.26 * boost;
+      if (player.suitFlash > 0) player.suitFlash--;
+      if (player.throwCooldown > 0) player.throwCooldown--;
+      if (player.throwAnim > 0) player.throwAnim--;
+
+      if (zComboTimer > 0) zComboTimer--;
+      else zCombo = 0;
+    }
+
+    function updateCandidates() {
+      for (let i = candidates.length - 1; i >= 0; i--) {
+        const c = candidates[i];
+        c.bob += 0.12 + Math.abs(c.vx) * 0.02;
+        c.x += c.vx * (freezeTimer > 0 ? 0.25 : 1);
+        c.y = FLOOR - 52 + Math.sin(c.bob) * 2;
+
+        if (magnetTimer > 0) {
+          c.x += (player.x - c.x) * 0.012;
+        }
+
+        if (c.x < -80 || c.x > W + 80) {
+          missCandidate(c);
+          candidates.splice(i, 1);
+          continue;
+        }
+
+        const playerHitbox = { x: player.x + 10, y: player.y + 14, w: player.w - 20, h: player.h - 8 };
+        const target = { x: c.x, y: c.y, w: c.w, h: c.h };
+
+        if (rectHit(playerHitbox, target)) {
+          catchCandidate(c, 'grab');
+          candidates.splice(i, 1);
+          continue;
+        }
+
+        for (let p = projectiles.length - 1; p >= 0; p--) {
+          const proj = projectiles[p];
+          if (rectHit(proj, target)) {
+            catchCandidate(c, proj.type);
+            projectiles.splice(p, 1);
+            candidates.splice(i, 1);
+            break;
+          }
+        }
+      }
+    }
+
+    function updateProjectiles() {
+      for (let i = projectiles.length - 1; i >= 0; i--) {
+        const p = projectiles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.spin += p.type === 'banana' ? 0.36 : 0.18;
+        if (p.type === 'contract') p.vy += 0.12;
+        if (p.x < -80 || p.x > W + 80 || p.y > H + 50) projectiles.splice(i, 1);
+      }
+
+      if (contractRain) {
+        contractRainTimer--;
+        if (frame % 2 === 0) {
+          projectiles.push({
+            x: rand(50, W - 50),
+            y: rand(-50, 20),
+            w: 24,
+            h: 12,
+            vx: rand(-0.5, 0.5),
+            vy: rand(3.5, 5.1),
+            spin: rand(-0.2, 0.2),
+            type: 'contract'
+          });
+        }
+        if (contractRainTimer <= 0) contractRain = false;
+      }
+    }
+
+    function updatePowerups() {
+      for (let i = powerups.length - 1; i >= 0; i--) {
+        const p = powerups[i];
+        p.ttl--;
+        p.y += Math.sin((frame + i * 9) * 0.08) * 0.18;
+        if (p.ttl <= 0) {
+          powerups.splice(i, 1);
+          continue;
+        }
+
+        if (rectHit({ x: player.x, y: player.y, w: player.w, h: player.h }, p)) {
+          if (p.kind === 'freeze') { freezeTimer = 60 * 4; bigMessage = 'PROCESO ÁGIL'; }
+          if (p.kind === 'magnet') { magnetTimer = 60 * 5; bigMessage = 'BUEN CLIMA'; }
+          if (p.kind === 'speed') { speedTimer = 60 * 5; bigMessage = 'OFERTA TOP'; }
+          messageTimer = 60;
+          addParticles(p.x, p.y, 16, '#f2c94c');
+          powerups.splice(i, 1);
+        }
+      }
+
+      if (freezeTimer > 0) freezeTimer--;
+      if (magnetTimer > 0) magnetTimer--;
+      if (speedTimer > 0) speedTimer--;
+    }
+
+    function updateEffects() {
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.15;
+        p.life--;
+        if (p.life <= 0) particles.splice(i, 1);
+      }
+
+      for (let i = floatTexts.length - 1; i >= 0; i--) {
+        const t = floatTexts[i];
+        t.y -= 0.55;
+        t.life--;
+        if (t.life <= 0) floatTexts.splice(i, 1);
+      }
+
+      if (messageTimer > 0) messageTimer--;
+      if (screenFlash > 0) screenFlash--;
+    }
+
+    function updateGame() {
+      frame++;
+      officeScroll += 1.1;
+      gameClock--;
+      if (gameClock <= 0) {
+        running = false;
+        victory = true;
+      }
+
+      updatePlayer();
+      updateCandidates();
+      updateProjectiles();
+      updatePowerups();
+      updateEffects();
+
+      spawnTimer--;
+      if (spawnTimer <= 0) {
+        spawnCandidate();
+        if (score > 2500 && Math.random() < 0.36) spawnCandidate();
+        spawnTimer = Math.max(16, 54 - Math.floor(score / 320));
+      }
+
+      if (frame % 480 === 0 && Math.random() < 0.85) spawnPowerup();
+      if (score >= 4500 && !victory) {
+        running = false;
+        victory = true;
+      }
+    }
+
+    function drawCity() {
+      const grad = ctx.createLinearGradient(0, 0, 0, FLOOR);
+      grad.addColorStop(0, '#1a2b4f');
+      grad.addColorStop(0.58, '#102238');
+      grad.addColorStop(1, '#0b1422');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, FLOOR);
+
+      ctx.fillStyle = '#f2c94c';
+      ctx.fillRect(736, 74, 60, 60);
+      ctx.fillStyle = '#1a2b4f';
+      ctx.fillRect(754, 74, 60, 60);
+
+      for (let i = 0; i < 60; i++) {
+        const sx = (i * 131) % W;
+        const sy = (i * 83) % 185;
+        ctx.fillStyle = i % 7 === 0 ? '#f2c94c' : '#d8f0ff';
+        ctx.fillRect(sx, sy, 2, 2);
+      }
+
+      for (let i = 0; i < 13; i++) {
+        const bw = 38 + (i % 4) * 18;
+        const bh = 120 + (i * 37 % 170);
+        const bx = (i * 88 - officeScroll * 0.2) % (W + 120) - 100;
+        const by = FLOOR - bh;
+        ctx.fillStyle = i % 2 ? '#13263d' : '#1a2d46';
+        ctx.fillRect(bx, by, bw, bh);
+        for (let wx = 6; wx < bw - 6; wx += 12) {
+          for (let wy = 10; wy < bh - 10; wy += 14) {
+            ctx.fillStyle = ((wx + wy + i) % 5 === 0) ? '#f2c94c' : '#20364f';
+            ctx.fillRect(bx + wx, by + wy, 6, 8);
+          }
+        }
+      }
+    }
+
+    function drawOfficeFloor() {
+      ctx.fillStyle = '#1d2d3d';
+      ctx.fillRect(0, FLOOR, W, H - FLOOR);
+      ctx.fillStyle = '#0b1624';
+      for (let i = -40; i < W + 50; i += 44) {
+        const x = ((i - officeScroll * 2) % (W + 88)) - 44;
+        ctx.fillRect(x, FLOOR + 50, 26, 8);
+      }
+      ctx.fillStyle = '#2ef07f';
+      ctx.fillRect(0, FLOOR, W, 4);
+    }
+
+    function drawDeskProps() {
+      ctx.fillStyle = '#3a2d1e';
+      ctx.fillRect(58, FLOOR - 62, 112, 62);
+      ctx.fillStyle = '#232323';
+      ctx.fillRect(74, FLOOR - 98, 64, 36);
+      ctx.fillStyle = '#79c7ff';
+      ctx.fillRect(82, FLOOR - 90, 48, 20);
+      ctx.fillStyle = '#8a6844';
+      ctx.fillRect(790, FLOOR - 72, 130, 72);
+      ctx.fillStyle = '#d9d9d9';
+      ctx.fillRect(812, FLOOR - 102, 60, 30);
+      ctx.fillStyle = '#2ef07f';
+      ctx.fillRect(820, FLOOR - 92, 42, 12);
+    }
+
+    function drawHiringKong() {
+      const x = player.x;
+      const y = player.y;
+      const step = Math.sin(player.anim) * 5;
+      const flash = player.suitFlash > 0;
+      const armOffset = player.throwAnim > 0 ? 16 : 0;
+      const armY = player.throwAnim > 0 ? -8 : 30;
+
+      ctx.fillStyle = '#707785';
+      ctx.fillRect(x + 16, y + 4, 36, 26);
+      ctx.fillRect(x + 8, y + 26, 52, 36);
+      ctx.fillRect(x + 4, y + 56, 18, 20);
+      ctx.fillRect(x + 36, y + 56, 18, 20);
+      ctx.fillRect(x - 2, y + 30, 16, 16);
+      ctx.fillRect(x + 52 + armOffset, y + armY, 16, 16);
+
+      ctx.fillStyle = flash ? '#f2c94c' : '#0f1b2f';
+      ctx.fillRect(x + 12, y + 28, 44, 26);
+      ctx.fillStyle = '#e9f2ff';
+      ctx.fillRect(x + 28, y + 28, 12, 16);
+      ctx.fillStyle = '#2ef07f';
+      ctx.fillRect(x + 30, y + 38, 8, 14);
+
+      ctx.fillStyle = '#424752';
+      ctx.fillRect(x + 20, y + 12, 18, 10);
+      ctx.fillStyle = '#0a1220';
+      ctx.fillRect(x + 40, y + 14, 4, 4);
+      ctx.fillRect(x + 18, y + 60 + step, 10, 20);
+      ctx.fillRect(x + 40, y + 60 - step, 10, 20);
+    }
+
+    function drawCandidate(c) {
+      ctx.fillStyle = '#f0c39f';
+      ctx.fillRect(c.x + 8, c.y, 14, 12);
+      ctx.fillStyle = '#111827';
+      ctx.fillRect(c.x + 6, c.y + 12, 18, 24);
+      ctx.fillStyle = '#e9f2ff';
+      ctx.fillRect(c.x + 10, c.y + 12, 10, 12);
+      ctx.fillStyle = c.color;
+      ctx.fillRect(c.x + 13, c.y + 18, 4, 12);
+      ctx.fillStyle = '#111827';
+      ctx.fillRect(c.x + 7, c.y + 36, 7, 16);
+      ctx.fillRect(c.x + 17, c.y + 36, 7, 16);
+      ctx.fillStyle = '#d9ecff';
+      ctx.font = '10px monospace';
+      ctx.fillText(c.label, c.x - 6, c.y - 6);
+    }
+
+    function drawProjectile(p) {
+      ctx.save();
+      ctx.translate(p.x + p.w / 2, p.y + p.h / 2);
+      ctx.rotate(p.spin);
+      if (p.type === 'contract') {
+        ctx.fillStyle = '#e9f2ff';
+        ctx.fillRect(-12, -6, 24, 12);
+        ctx.fillStyle = '#2ef07f';
+        ctx.fillRect(-4, -3, 8, 6);
+      } else {
+        ctx.fillStyle = '#f2c94c';
+        ctx.fillRect(-10, -4, 20, 8);
+        ctx.fillStyle = '#08111f';
+        ctx.fillRect(6, -2, 2, 2);
+      }
+      ctx.restore();
+    }
+
+    function drawPowerup(p) {
+      ctx.fillStyle = p.kind === 'freeze' ? '#79c7ff' : p.kind === 'magnet' ? '#7dff7d' : '#f2c94c';
+      ctx.fillRect(p.x, p.y, p.w, p.h);
+      ctx.fillStyle = '#08111f';
+      if (p.kind === 'freeze') ctx.fillRect(p.x + 8, p.y + 5, 8, 14);
+      if (p.kind === 'magnet') { ctx.fillRect(p.x + 4, p.y + 5, 6, 14); ctx.fillRect(p.x + 14, p.y + 5, 6, 14); }
+      if (p.kind === 'speed') { ctx.fillRect(p.x + 5, p.y + 10, 14, 4); ctx.fillRect(p.x + 13, p.y + 6, 6, 4); }
+    }
+
+    function drawHUD() {
+      ctx.fillStyle = 'rgba(5,10,18,.84)';
+      ctx.fillRect(0, 0, W, 66);
+      ctx.strokeStyle = '#2ef07f';
+      ctx.strokeRect(0, 0, W, 66);
+
+      ctx.fillStyle = '#2ef07f';
+      ctx.font = 'bold 22px monospace';
+      ctx.fillText('HIRINGKONG', 16, 28);
+      ctx.font = '14px monospace';
+      ctx.fillStyle = '#e9f2ff';
+      ctx.fillText('HIRES: ' + score, 18, 50);
+      ctx.fillText('ESCAPADOS: ' + escaped + '/6', 180, 50);
+      ctx.fillText('COMBO: x' + combo, 360, 50);
+      ctx.fillText('TIEMPO: ' + Math.ceil(gameClock / 60), 520, 50);
+      ctx.fillText('META: 4500', 650, 50);
+      ctx.fillText('Z COMBO: ' + zCombo + '/3', 790, 50);
+
+      if (freezeTimer > 0) { ctx.fillStyle = '#79c7ff'; ctx.fillText('PROCESO ÁGIL', 790, 24); }
+      if (magnetTimer > 0) { ctx.fillStyle = '#7dff7d'; ctx.fillText('BUEN CLIMA', 790, 24); }
+      if (speedTimer > 0) { ctx.fillStyle = '#f2c94c'; ctx.fillText('OFERTA TOP', 790, 24); }
+    }
+
+    function drawEffects() {
+      for (const p of particles) {
+        ctx.globalAlpha = p.life / 40;
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.x, p.y, 4, 4);
+      }
+      ctx.globalAlpha = 1;
+
+      for (const t of floatTexts) {
+        ctx.globalAlpha = Math.min(1, t.life / 30);
+        ctx.fillStyle = t.color;
+        ctx.font = 'bold 14px monospace';
+        ctx.fillText(t.text, t.x, t.y);
+      }
+      ctx.globalAlpha = 1;
+
+      if (messageTimer > 0) {
+        ctx.fillStyle = 'rgba(0,0,0,.56)';
+        ctx.fillRect(W / 2 - 205, 84, 410, 42);
+        ctx.strokeStyle = '#f2c94c';
+        ctx.strokeRect(W / 2 - 205, 84, 410, 42);
+        ctx.fillStyle = '#f2c94c';
+        ctx.font = 'bold 22px monospace';
+        ctx.fillText(bigMessage, W / 2 - ctx.measureText(bigMessage).width / 2, 112);
+      }
+
+      if (screenFlash > 0) {
+        ctx.fillStyle = 'rgba(46,240,127,' + (screenFlash / 24) + ')';
+        ctx.fillRect(0, 0, W, H);
+      }
+    }
+
+    function drawMenuOverlay() {
+      ctx.fillStyle = 'rgba(2,7,14,.84)';
+      ctx.fillRect(150, 110, 700, 340);
+      ctx.strokeStyle = '#2ef07f';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(150, 110, 700, 340);
+
+      ctx.fillStyle = '#2ef07f';
+      ctx.font = 'bold 42px monospace';
+      ctx.fillText('HIRINGKONG', W / 2 - ctx.measureText('HIRINGKONG').width / 2, 185);
+      ctx.fillStyle = '#e9f2ff';
+      ctx.font = '20px monospace';
+      const sub = 'El recruiter que sí contrata';
+      ctx.fillText(sub, W / 2 - ctx.measureText(sub).width / 2, 235);
+      ctx.font = '18px monospace';
+      ctx.fillText('← → / A D mover · ↑ / W / ESPACIO saltar · Z banana', W / 2 - 300, 288);
+      ctx.fillText('Junior = más difícil y más puntos', W / 2 - 170, 320);
+      ctx.fillText('3 veces Z = lluvia de contratos', W / 2 - 175, 350);
+      ctx.fillStyle = '#f2c94c';
+      ctx.font = 'bold 24px monospace';
+      ctx.fillText('▶ CLICK EN INICIAR', W / 2 - 120, 395);
+    }
+
+    function drawWinLose() {
+      if (!victory && !gameOver) return;
+      const title = victory ? 'LEVEL COMPLETED' : 'GAME OVER';
+      const main = victory ? 'CONSEGUISTE LABURO' : 'SE ESCAPÓ EL LABURO';
+      const subtitle = victory ? 'Este candidato sos vos. No te escapes.' : 'Se escapó demasiado talento.';
+      const detail = victory ? 'Click en VER MI CV abajo.' : 'Reiniciá y contratá mejor.';
+
+      ctx.fillStyle = 'rgba(2,7,14,.90)';
+      ctx.fillRect(140, 110, 720, 340);
+      ctx.strokeStyle = victory ? '#2ef07f' : '#ff5d73';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(140, 110, 720, 340);
+
+      ctx.fillStyle = victory ? '#2ef07f' : '#ff5d73';
+      ctx.font = 'bold 42px monospace';
+      ctx.fillText(title, W / 2 - ctx.measureText(title).width / 2, 185);
+      ctx.fillStyle = '#f2c94c';
+      ctx.font = 'bold 34px monospace';
+      ctx.fillText(main, W / 2 - ctx.measureText(main).width / 2, 240);
+      ctx.fillStyle = '#e9f2ff';
+      ctx.font = '20px monospace';
+      ctx.fillText(subtitle, W / 2 - ctx.measureText(subtitle).width / 2, 292);
+      ctx.fillText(detail, W / 2 - ctx.measureText(detail).width / 2, 324);
+      ctx.fillText('Puntaje: ' + score + ' · Mejor combo: x' + bestCombo + ' · Escapados: ' + escaped, W / 2 - 255, 370);
+      ctx.fillStyle = '#79c7ff';
+      ctx.fillText('Reiniciá o abrí tu CV abajo.', W / 2 - 150, 405);
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+      drawCity();
+      drawDeskProps();
+      drawOfficeFloor();
+      for (const p of powerups) drawPowerup(p);
+      for (const p of projectiles) drawProjectile(p);
+      for (const c of candidates) drawCandidate(c);
+      drawHiringKong();
+      drawEffects();
+      drawHUD();
+
+      if (!running && !gameOver && !victory) drawMenuOverlay();
+      drawWinLose();
+    }
+
+    function loop() {
+      if (!running) {
+        draw();
+        return;
+      }
+      updateGame();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    document.addEventListener('keydown', (e) => {
+      keys[e.key] = true;
+      if (!running && !victory && !gameOver && e.key === 'Enter') startGame();
+      if ((e.key === 'z' || e.key === 'Z') && running) {
+        throwArm();
+        e.preventDefault();
+      }
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'z', 'Z'].includes(e.key)) {
+        e.preventDefault();
+      }
+    });
+
+    document.addEventListener('keyup', (e) => {
+      keys[e.key] = false;
+    });
+
+    document.getElementById('startBtn').addEventListener('click', startGame);
+    document.getElementById('restartBtn').addEventListener('click', resetGame);
+    document.getElementById('cvBtn').addEventListener('click', openCV);
+
+    resetGame();
+  </script>
+</body>
+</html>
