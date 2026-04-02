@@ -33,10 +33,13 @@ Este proyecto fue desarrollado bajo una premisa de **cero dependencias externas*
 A diferencia de un juego convencional, **Hiring Kong** es una herramienta de conversión. Al alcanzar la meta de 4500 puntos (o agotar el tiempo), el juego culmina en un mensaje de éxito: **"CONSEGUISTE LABURO"**. 
 
 Este estado final desbloquea un **CTA (Call To Action)** directo para visualizar mi CV, transformando la experiencia lúdica en una oportunidad de contratación real.
+<img width="1024" height="1536" alt="ChatGPT Image 2 abr 2026, 14_33_46" src="https://github.com/user-attachments/assets/34ee56f2-0a42-440a-bcc1-3d62c9ae426b" />
 
 ---
 
 ## 🚀 Instalación y Uso
+
+
 
 1. Clona el repositorio:
    `git clone https://github.com/tu-usuario/hiring-kong.git`
